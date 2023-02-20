@@ -32,7 +32,7 @@
 #ifndef STX_STX_BTREE_H_HEADER
 #define STX_STX_BTREE_H_HEADER
 
-#define MAX_SIZE 256
+#define MAX_SIZE 4096
 // #define MAX_SIZE 512
 // #define MAX_SIZE 64 * 1024
 
@@ -51,6 +51,7 @@
 #include <cstddef>
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 // *** Debugging Macros
 
@@ -1860,6 +1861,47 @@ public:
         return num;
     }
 
+    std::vector<std::pair<key_type, data_type>> query_range
+    (const key_type& min_key, const key_type& max_key) const
+    {
+        std::vector<std::pair<key_type, data_type>> v_res;
+        // std::cout << "range query(B+): " << min_key << " - " << max_key << std::endl;
+        get_entries_recursion(m_root, min_key, max_key, v_res);
+        // std::cout << "v_res.size (B+) " << v_res.size() << std::endl;
+        // for(int i = 0; i<(int)v_res.size() ;i++)
+        // {
+        //     std::cout << "key " << v_res[i].first << std::endl;
+        // }
+        return v_res;
+    }
+
+    void get_entries_recursion(node* n, const key_type& min_key, const key_type& max_key,
+    std::vector<std::pair<key_type, data_type>>& v_res) const
+    {
+        if(!n->isleafnode())
+        {
+            const inner_node* inner = static_cast<const inner_node*>(n);
+            int lower_slot = find_lower(inner, min_key);
+            int upper_slot = find_upper(inner, max_key);
+            // std::cout << lower_slot << ", " << upper_slot << std::endl;
+            for(int slot = lower_slot; slot <= upper_slot; slot++)
+            {
+                get_entries_recursion(inner->childid[slot], min_key, max_key, v_res);
+            }
+        }
+        else
+        {
+            const leaf_node* leaf = static_cast<const leaf_node*>(n);
+            int lower_slot = find_lower(leaf, min_key);
+            int upper_slot = find_upper(leaf, max_key);
+            // std::cout << lower_slot << ", " << upper_slot << std::endl;
+            for(int slot = lower_slot; slot < upper_slot; slot++)
+            {
+                v_res.push_back(std::make_pair(leaf->slotkey[slot], leaf->slotdata[slot]));
+            }
+        }
+    }
+
     /// Searches the B+ tree and returns an iterator to the first pair
     /// equal to or greater than key, or end() if all keys are smaller.
     iterator lower_bound(const key_type& key)
@@ -1911,6 +1953,13 @@ public:
             << std::endl;  
     }
 
+    void print_stat()
+    {
+        std::cout << "Num keys: " << m_stats.itemcount
+                  << " Num Inner Nodes: " << m_stats.innernodes
+                  << " Num Leaf Nodes: " << m_stats.leaves
+                  << std::endl; 
+    }
 
     /// Searches the B+ tree and returns an iterator to the first pair
     /// equal to or greater than key, or end() if all keys are smaller.
